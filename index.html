@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>旅行診断アプリ</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #f0f2f5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .app-container {
+      position: relative;
+      width: 100%;
+      max-width: 430px;
+      height: 100vh;
+      max-height: 932px;
+      background-color: #ffffff;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+    }
+
+    .screen {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .screen.active {
+      display: block;
+    }
+
+    #screen-loading.screen.active {
+      display: flex;
+    }
+
+    .main-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #screen-07, #screen-08 {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+    }
+
+    .scrollable-img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* DAY1 / DAY2 の切り替え表示管理 */
+    .day-content {
+      display: none;
+      width: 100%;
+    }
+    .day-content.active-day {
+      display: block;
+    }
+
+    /* ========================================================
+       DAY1 / DAY2 タブボタン固定配置エリア
+       ======================================================== */
+    .day-switch-area-1 {
+      position: absolute;
+      top: 290px;
+      left: 2px;
+      width: 105px;
+      height: 36px;
+      cursor: pointer;
+      z-index: 150;
+      background: transparent;
+      border: none;
+    }
+
+    .day-switch-area-2 {
+      position: absolute;
+      top: 290px;
+      left: 106px;
+      width: 103px;
+      height: 33px;
+      cursor: pointer;
+      z-index: 150;
+      background: transparent;
+      border: none;
+    }
+
+    .plan-form-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 1300px;
+      pointer-events: none;
+    }
+
+    /* 入力画面の各選択ボックス */
+    .resizable-box {
+      position: absolute;
+      background: transparent;
+      border: none;
+      pointer-events: auto;
+      z-index: 100;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding-left: 12px;
+      font-size: 14px;
+      color: #333333;
+      text-align: left;
+    }
+
+    #box-pref         { top: 325px; left: 46px; width: 338px; height: 52px; }
+    #box-purpose      { top: 430px; left: 43px; width: 339px; height: 54px; }
+    #box-duration     { top: 535px; left: 43px; width: 338px; height: 52px; }
+    #box-transport    { top: 640px; left: 41px; width: 343px; height: 50px; }
+    #box-travel-time  { top: 744px; left: 42px; width: 341px; height: 51px; }
+    #box-budget       { top: 845px; left: 41px; width: 339px; height: 50px; }
+    #box-companion    { top: 949px; left: 40px; width: 343px; height: 53px; }
+    #box-generation   { top: 1053px; left: 41px; width: 341px; height: 51px; }
+    #box-submit       { top: 1157px; left: 162px; width: 102px; height: 30px; padding-left: 0; justify-content: center; }
+
+    #custom-picker-modal {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    #custom-picker-modal.active {
+      display: flex;
+      pointer-events: auto;
+    }
+
+    .picker-card {
+      background: #ffffff;
+      width: 70%;
+      max-width: 280px;
+      max-height: 50vh;
+      border-radius: 16px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      overflow-y: auto;
+      padding: 6px 0;
+    }
+
+    .picker-item {
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #b30000; /* 基本は暗めの赤文字 */
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 1px solid #f7f7f7;
+    }
+
+    /* 「誰と旅をするか」の項目は黒字にする */
+    .picker-item.companion-item {
+      color: #333333 !important;
+    }
+
+    .picker-item.disabled {
+      color: #666666 !important;
+      background-color: #eeeeee !important;
+      font-weight: 400 !important;
+      cursor: not-allowed !important;
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .click-area {
+      position: absolute;
+      cursor: pointer;
+      z-index: 10;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* 各質問の選択肢位置設定 */
+    .opt-4-1 { top: 38.5%; left: 12%; width: 76%; height: 7.5%; border-radius: 12px; }
+    .opt-4-2 { top: 48.0%; left: 12%; width: 76%; height: 7.5%; border-radius: 12px; }
+    .opt-4-3 { top: 57.5%; left: 12%; width: 76%; height: 7.5%; border-radius: 12px; }
+    .opt-4-4 { top: 67.0%; left: 12%; width: 76%; height: 7.5%; border-radius: 12px; }
+
+    .opt-2-1 { top: 45.0%; left: 12%; width: 76%; height: 7.5%; border-radius: 12px; }
+    .opt-2-2 { top: 58.0%; left: 12%; width: 76%; height: 7.5%; border-radius: 12px; }
+
+    .back-button { top: 80.5%; left: 12%; width: 28%; height: 4.5%; border-radius: 20px; }
+
+    /* 診断結果画面 */
+    #screen-06 {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #FF77D9;
+    }
+
+    #screen-06 .result-bg-img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      z-index: 1;
+      display: block;
+    }
+
+    .result-card-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 100;
+      transform: translateY(100%);
+      transition: transform 1.4s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+
+    #screen-06.slide-up .result-card-wrapper {
+      transform: translateY(0);
+    }
+
+    .result-card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .result-btn-end {
+      position: absolute; bottom: 4.5%; left: 18.5%; width: 30%; height: 4.5%; border-radius: 20px; z-index: 200; cursor: pointer;
+    }
+
+    .result-btn-plan {
+      position: absolute; bottom: 4.5%; left: 51.5%; width: 44%; height: 4.5%; border-radius: 20px; z-index: 200; cursor: pointer;
+    }
+
+    .plan-detail-overlay {
+      position: sticky;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 80px;
+      margin-top: -80px;
+      pointer-events: none;
+      z-index: 200;
+    }
+
+    .plan-detail-end {
+      position: absolute; bottom: 35px; left: 18.5%; width: 30%; height: 40px; border-radius: 20px; z-index: 210; cursor: pointer; pointer-events: auto;
+    }
+
+    .plan-detail-save {
+      position: absolute; bottom: 35px; left: 51.5%; width: 44%; height: 40px; border-radius: 20px; z-index: 210; cursor: pointer; pointer-events: auto;
+    }
+
+    #screen-loading {
+      background-color: #ffffff;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      z-index: 20;
+    }
+
+    .loading-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .spinner-box {
+      position: relative;
+      width: 56px;
+      height: 56px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .ring-spinner {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 3px solid rgba(24, 119, 242, 0.12);
+      border-top-color: #1877F2;
+      border-radius: 50%;
+      animation: spin 1.1s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+    }
+
+    .center-icon {
+      width: 22px;
+      height: 22px;
+      fill: #1877F2;
+      animation: pulse 1.6s ease-in-out infinite alternate;
+    }
+
+    .loading-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1877F2;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+
+    .loading-sub {
+      font-size: 12px;
+      color: #1F2937;
+      font-weight: 500;
+      opacity: 0.8;
+      min-height: 18px;
+    }
+
+    .dots-container {
+      display: flex;
+      gap: 5px;
+      margin-top: 16px;
+    }
+
+    .dot {
+      width: 5px;
+      height: 5px;
+      background-color: #1877F2;
+      border-radius: 50%;
+      animation: dotPulse 1.2s infinite ease-in-out;
+    }
+
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.92); opacity: 0.8; }
+      100% { transform: scale(1.08); opacity: 1; }
+    }
+
+    @keyframes dotPulse {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+      40% { transform: scale(1.1); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+
+    <div id="screen-01" class="screen active" onclick="showScreen('screen-02')">
+      <img src="アプリデザイン検討-01.png" alt="" class="main-img">
+    </div>
+
+    <div id="screen-02" class="screen">
+      <img src="アプリデザイン検討-02.png" alt="" class="main-img">
+      <div class="click-area opt-4-1" onclick="selectOption('screen-02', 'アプリデザイン検討-06.png', 'screen-03', 1, 1)"></div>
+      <div class="click-area opt-4-2" onclick="selectOption('screen-02', 'アプリデザイン検討-10.png', 'screen-03', 1, 2)"></div>
+      <div class="click-area opt-4-3" onclick="selectOption('screen-02', 'アプリデザイン検討-14.png', 'screen-03', 1, 3)"></div>
+      <div class="click-area opt-4-4" onclick="selectOption('screen-02', 'アプリデザイン検討-17.png', 'screen-03', 1, 4)"></div>
+      <div class="click-area back-button" onclick="showScreen('screen-01')"></div>
+    </div>
+
+    <div id="screen-03" class="screen">
+      <img src="アプリデザイン検討-03.png" alt="" class="main-img">
+      <div class="click-area opt-4-1" onclick="selectOption('screen-03', 'アプリデザイン検討-07.png', 'screen-04', 2, 1)"></div>
+      <div class="click-area opt-4-2" onclick="selectOption('screen-03', 'アプリデザイン検討-11.png', 'screen-04', 2, 2)"></div>
+      <div class="click-area opt-4-3" onclick="selectOption('screen-03', 'アプリデザイン検討-15.png', 'screen-04', 2, 3)"></div>
+      <div class="click-area opt-4-4" onclick="selectOption('screen-03', 'アプリデザイン検討-18.png', 'screen-04', 2, 4)"></div>
+      <div class="click-area back-button" onclick="showScreen('screen-02')"></div>
+    </div>
+
+    <div id="screen-04" class="screen">
+      <img src="アプリデザイン検討-04.png" alt="" class="main-img">
+      <div class="click-area opt-2-1" onclick="selectOption('screen-04', 'アプリデザイン検討-08.png', 'screen-05', 3, 1)"></div>
+      <div class="click-area opt-2-2" onclick="selectOption('screen-04', 'アプリデザイン検討-12.png', 'screen-05', 3, 2)"></div>
+      <div class="click-area back-button" onclick="showScreen('screen-03')"></div>
+    </div>
+
+    <div id="screen-05" class="screen">
+      <img src="アプリデザイン検討-05.png" alt="" class="main-img">
+      <div class="click-area opt-4-1" onclick="selectOptionFinal('screen-05', 'アプリデザイン検討-09.png', 4, 1)"></div>
+      <div class="click-area opt-4-2" onclick="selectOptionFinal('screen-05', 'アプリデザイン検討-13.png', 4, 2)"></div>
+      <div class="click-area opt-4-3" onclick="selectOptionFinal('screen-05', 'アプリデザイン検討-16.png', 4, 3)"></div>
+      <div class="click-area opt-4-4" onclick="selectOptionFinal('screen-05', 'アプリデザイン検討-19.png', 4, 4)"></div>
+      <div class="click-area back-button" onclick="showScreen('screen-04')"></div>
+    </div>
+
+    <div id="screen-loading" class="screen">
+      <div class="loading-content">
+        <div class="spinner-box">
+          <div class="ring-spinner"></div>
+          <svg class="center-icon" viewBox="0 0 24 24">
+            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+          </svg>
+        </div>
+        <div class="loading-title">分析中...</div>
+        <div id="loading-sub-text" class="loading-sub">あなたにぴったりの旅スタイルを計算しています</div>
+        <div class="dots-container">
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-06" class="screen">
+      <img id="result-bg" class="result-bg-img" src="" alt="">
+      <div class="result-card-wrapper">
+        <img id="result-card" class="result-card-img" src="" alt="">
+        <div class="result-btn-end" onclick="showScreen('screen-01')"></div>
+        <div class="result-btn-plan" onclick="showScreen('screen-07')"></div>
+      </div>
+    </div>
+
+    <div id="screen-07" class="screen">
+      <img src="アプリデザイン検討-52.png" alt="" class="scrollable-img">
+      <div class="plan-form-overlay">
+        <div id="box-pref" class="resizable-box" onclick="openPicker('pref')"></div>
+        <div id="box-purpose" class="resizable-box" onclick="openPicker('purpose')"></div>
+        <div id="box-duration" class="resizable-box" onclick="openPicker('duration')"></div>
+        <div id="box-transport" class="resizable-box" onclick="openPicker('transport')"></div>
+        <div id="box-travel-time" class="resizable-box" onclick="openPicker('travel-time')"></div>
+        <div id="box-budget" class="resizable-box" onclick="openPicker('budget')"></div>
+        <div id="box-companion" class="resizable-box" onclick="openPicker('companion')"></div>
+        <div id="box-generation" class="resizable-box" onclick="openPicker('generation')"></div>
+        <div id="box-submit" class="resizable-box" onclick="submitPlan()"></div>
+      </div>
+    </div>
+
+    <div id="screen-08" class="screen">
+      <!-- DAY1 コンテンツ -->
+      <div id="content-day1" class="day-content active-day">
+        <img id="plan-img-day1" src="" alt="プラン DAY1" class="scrollable-img">
+      </div>
+
+      <!-- DAY2 コンテンツ -->
+      <div id="content-day2" class="day-content">
+        <img id="plan-img-day2" src="" alt="プラン DAY2" class="scrollable-img">
+      </div>
+
+      <!-- 切り替えボタン -->
+      <div class="day-switch-area-1" onclick="switchDay('day1')"></div>
+      <div class="day-switch-area-2" onclick="switchDay('day2')"></div>
+      
+      <div class="plan-detail-overlay">
+        <div class="plan-detail-end" onclick="showScreen('screen-01')"></div>
+        <div class="plan-detail-save" onclick="savePlan()"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="custom-picker-modal" onclick="closePickerOnBg(event)">
+    <div class="picker-card" id="picker-card-content"></div>
+  </div>
+
+  <script>
+    const userAnswers = { 1: 1, 2: 1, 3: 1, 4: 1 };
+    let currentAnswerKey = '1.1.1.1'; 
+
+    const validPrefs = [
+      "北海道","青森県","岩手県","宮城県","秋田県","山形県","福島県",
+      "茨城県","栃木県","群馬県","埼玉県","千葉県","東京都","神奈川県",
+      "新潟県","富山県","石川県","福井県","山梨県","長野県","岐阜県",
+      "静岡県","愛知県","三重県","滋賀県","京都府","大阪府","兵庫県",
+      "奈良県","和歌山県","鳥取県","島根県","岡山県","広島県","山口県",
+      "徳島県","香川県","愛媛県","高知県","福岡県","佐賀県","長崎県",
+      "熊本県","大分県","宮崎県","鹿児島県","沖縄県"
+    ];
+
+    const pickerOptionsData = {
+      'pref': validPrefs,
+      'purpose': ["観光・レジャー", "卒業旅行・記念旅行", "推し活・イベント遠征", "グルメ", "温泉・リフレッシュ"],
+      'duration': ["日帰り", "1泊", "2泊", "3泊", "それ以上"],
+      'transport': ["車", "電車・新幹線・バス", "飛行機", "自転車", "徒歩"],
+      'travel-time': ["1時間", "2時間", "3時間", "それ以上"],
+      'budget': ["〜1万", "〜2万", "〜3万", "〜5万", "〜7万", "〜10万", "それ以上"],
+      'companion': ["一人", "友人", "恋人", "家族"],
+      'generation': ["10代", "20代", "30代", "40代", "50代", "60代", "70代", "80代"]
+    };
+
+    function getAllowedValuesForCurrentState(key) {
+      const allowedMap = {
+        'pref': ['大阪府'],
+        'purpose': ['観光・レジャー', 'グルメ'],
+        'duration': ['日帰り', '1泊'],
+        'transport': ['電車・新幹線・バス'],
+        'travel-time': ['3時間'],
+        'budget': ['〜3万'],
+        'companion': null,
+        'generation': ['10代', '20代', '30代', '40代', '50代']
+      };
+      return allowedMap[key] || null;
+    }
+
+    const selectedValues = {
+      'pref': '', 'purpose': '', 'duration': '', 'transport': '',
+      'travel-time': '', 'budget': '', 'companion': '', 'generation': ''
+    };
+
+    function showScreen(screenId) {
+      document.querySelectorAll('.screen').forEach(s => {
+        s.classList.remove('active');
+        if (s.id === 'screen-06') {
+          s.classList.remove('slide-up');
+        }
+      });
+
+      const target = document.getElementById(screenId);
+      if (target) {
+        target.classList.add('active');
+        target.scrollTop = 0;
+
+        if (screenId === 'screen-06') {
+          setTimeout(() => {
+            target.classList.add('slide-up');
+          }, 50);
+        }
+
+        if (screenId === 'screen-08') {
+          switchDay('day1');
+        }
+      }
+    }
+
+    function switchDay(day) {
+      const content1 = document.getElementById('content-day1');
+      const content2 = document.getElementById('content-day2');
+
+      const screen08 = document.getElementById('screen-08');
+      if (screen08) screen08.scrollTop = 0;
+
+      if (day === 'day1') {
+        content1.classList.add('active-day');
+        content2.classList.remove('active-day');
+      } else {
+        content2.classList.add('active-day');
+        content1.classList.remove('active-day');
+      }
+    }
+
+    function selectOption(currentScreenId, selectedImgPath, nextScreenId, qNum, optNum) {
+      userAnswers[qNum] = optNum;
+      const currentImg = document.querySelector(`#${currentScreenId} .main-img`);
+      if (currentImg) currentImg.src = selectedImgPath;
+      setTimeout(() => showScreen(nextScreenId), 300);
+    }
+
+    function selectOptionFinal(currentScreenId, selectedImgPath, qNum, optNum) {
+      userAnswers[qNum] = optNum;
+      const currentImg = document.querySelector(`#${currentScreenId} .main-img`);
+      if (currentImg) currentImg.src = selectedImgPath;
+
+      currentAnswerKey = `${userAnswers[1]}.${userAnswers[2]}.${userAnswers[3]}.${userAnswers[4]}`;
+
+      setTimeout(() => {
+        showScreen('screen-loading');
+        
+        const subTextEl = document.getElementById('loading-sub-text');
+        if (subTextEl) subTextEl.textContent = 'あなたにぴったりの旅スタイルを計算しています';
+
+        setTimeout(() => {
+          if (subTextEl) subTextEl.textContent = '診断結果を構築中...';
+          
+          setTimeout(() => {
+            if (currentAnswerKey === '1.1.1.1' || currentAnswerKey === '1.3.1.1' || currentAnswerKey === '1.1.2.1' || currentAnswerKey === '1.2.1.1') {
+              setupResultImages('アプリデザイン検討-44.png', 'アプリデザイン検討-45.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.1.1.2') {
+              setupResultImages('診断結果-01.png', '診断結果-02.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.1.1.3') {
+              setupResultImages('診断結果-03.png', '診断結果-04.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.1.1.4') {
+              setupResultImages('診断結果-05.png', '診断結果-06.png', '#65D36E');
+            } else if (currentAnswerKey === '1.1.2.2') {
+              setupResultImages('診断結果-10.png', '診断結果-09.png', '#65D36E');
+            } else if (currentAnswerKey === '1.1.2.3') {
+              setupResultImages('診断結果-12.png', '診断結果-11.png', '#65D36E');
+            } else if (currentAnswerKey === '1.1.2.4') {
+              setupResultImages('診断結果-14.png', '診断結果-13.png', '#65D36E');
+            } else if (currentAnswerKey === '1.2.1.2') {
+              setupResultImages('診断結果-18.png', '診断結果-17.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.2.1.3') {
+              setupResultImages('診断結果-19.png', '診断結果-20.png', '#65D36E');
+            } else if (currentAnswerKey === '1.2.1.4') {
+              setupResultImages('診断結果-21.png', '診断結果-22.png', '#65D36E');
+            } else if (currentAnswerKey === '1.2.2.1') {
+              setupResultImages('診断結果-24.png', '診断結果-23.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.2.2.2') {
+              setupResultImages('診断結果-26.png', '診断結果-25.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.2.2.3') {
+              setupResultImages('診断結果-28.png', '診断結果-27.png', '#3B82F6');
+            } else if (currentAnswerKey === '1.2.2.4') {
+              setupResultImages('診断結果-30.png', '診断結果-29.png', '#3B82F6');
+            } else if (currentAnswerKey === '1.3.1.2') {
+              setupResultImages('診断結果２-01.png', '診断結果２-02.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.3.1.3') {
+              setupResultImages('診断結果２-03.png', '診断結果２-04.png', '#65D36E');
+            } else if (currentAnswerKey === '1.3.1.4') {
+              setupResultImages('診断結果２-05.png', '診断結果２-06.png', '#65D36E');
+            } else if (currentAnswerKey === '1.3.2.1') {
+              setupResultImages('診断結果２-07.png', '診断結果２-08.png', '#65D36E');
+            } else if (currentAnswerKey === '1.3.2.2') {
+              setupResultImages('診断結果２-09.png', '診断結果２-10.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.3.2.3') {
+              setupResultImages('診断結果２-12.png', '診断結果２-11.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.3.2.4') {
+              setupResultImages('診断結果２-13.png', '診断結果２-14.png', '#65D36E');
+            } else if (currentAnswerKey === '1.4.1.1') {
+              setupResultImages('診断結果２-16.png', '診断結果２-15.png', '#65D36E');
+            } else if (currentAnswerKey === '1.4.1.2') {
+              setupResultImages('診断結果２-17.png', '診断結果２-18.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.4.1.3') {
+              setupResultImages('診断結果２-19.png', '診断結果２-20.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.4.1.4') {
+              setupResultImages('診断結果２-21.png', '診断結果２-22.png', '#65D36E');
+            } else if (currentAnswerKey === '1.4.2.1') {
+              setupResultImages('アプリデザイン検討-33.png', 'アプリデザイン検討-32.png', '#65D36E');
+            } else if (currentAnswerKey === '1.4.2.2') {
+              setupResultImages('アプリデザイン検討-49.png', 'アプリデザイン検討-48.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.4.2.3') {
+              setupResultImages('診断結果２-23.png', '診断結果２-24.png', '#FF77D9');
+            } else if (currentAnswerKey === '1.4.2.4') {
+              setupResultImages('診断結果２-25.png', '診断結果２-26.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.1.1.1') {
+              setupResultImages('診断結果２-27.png', '診断結果２-28.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.1.1.2') {
+              setupResultImages('診断結果２-29.png', '診断結果２-30.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.1.1.3') {
+              setupResultImages('診断結果２-31.png', '診断結果２-32.png', '#65D36E');
+            } else if (currentAnswerKey === '2.1.1.4') {
+              setupResultImages('診断結果２-33.png', '診断結果２-34.png', '#F9A03F');
+            } else if (currentAnswerKey === '2.1.2.1') {
+              setupResultImages('診断結果２-36.png', '診断結果２-35.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.1.2.2') {
+              setupResultImages('アプリデザイン検討-35.png', 'アプリデザイン検討-34.png', '#65D36E');
+            } else if (currentAnswerKey === '2.1.2.3') {
+              setupResultImages('診断結果２-38.png', '診断結果２-37.png', '#65D36E');
+            } else if (currentAnswerKey === '2.1.2.4') {
+              setupResultImages('診断結果２-40.png', '診断結果２-39.png', '#65D36E');
+            } else if (currentAnswerKey === '2.2.1.1') {
+              setupResultImages('診断結果２-42.png', '診断結果２-41.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.2.1.2') {
+              setupResultImages('アプリデザイン検討-28.png', 'アプリデザイン検討-29.png', '#65D36E');
+            } else if (currentAnswerKey === '2.2.1.3') {
+              setupResultImages('診断結果２-43.png', '診断結果２-44.png', '#65D36E');
+            } else if (currentAnswerKey === '2.2.1.4') {
+              setupResultImages('診断結果２-45.png', '診断結果２-46.png', '#F9A03F');
+            } else if (currentAnswerKey === '2.2.2.1') {
+              setupResultImages('アプリデザイン検討-47.png', 'アプリデザイン検討-46.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.2.2.2') {
+              setupResultImages('診断結果２-48.png', '診断結果２-47.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.2.2.3') {
+              setupResultImages('診断結果２-50.png', '診断結果２-49.png', '#3B82F6');
+            } else if (currentAnswerKey === '2.2.2.4') {
+              setupResultImages('診断結果２-52.png', '診断結果２-51.png', '#3B82F6');
+            } else if (currentAnswerKey === '2.3.1.1') {
+              setupResultImages('診断結果２-54.png', '診断結果２-53.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.3.1.2') {
+              setupResultImages('診断結果２-56.png', '診断結果２-55.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.3.1.3') {
+              setupResultImages('アプリデザイン検討-30.png', 'アプリデザイン検討-31.png', '#65D36E');
+            } else if (currentAnswerKey === '2.3.1.4') {
+              setupResultImages('診断結果３-01.png', '診断結果３-02.png', '#F9A03F');
+            } else if (currentAnswerKey === '2.3.2.1') {
+              setupResultImages('診断結果３-04.png', '診断結果３-03.png', '#65D36E');
+            } else if (currentAnswerKey === '2.3.2.2') {
+              setupResultImages('診断結果３-06.png', '診断結果３-05.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.3.2.3') {
+              setupResultImages('診断結果３-07.png', '診断結果３-08.png', '#65D36E');
+            } else if (currentAnswerKey === '2.3.2.4') {
+              setupResultImages('診断結果３-09.png', '診断結果３-10.png', '#F9A03F');
+            } else if (currentAnswerKey === '2.4.1.1') {
+              setupResultImages('診断結果３-12.png', '診断結果３-11.png', '#65D36E');
+            } else if (currentAnswerKey === '2.4.1.2') {
+              setupResultImages('診断結果３-14.png', '診断結果３-13.png', '#3B82F6');
+            } else if (currentAnswerKey === '2.4.1.3') {
+              setupResultImages('診断結果３-15.png', '診断結果３-16.png', '#65D36E');
+            } else if (currentAnswerKey === '2.4.1.4') {
+              setupResultImages('診断結果３-17.png', '診断結果３-18.png', '#F9A03F');
+            } else if (currentAnswerKey === '2.4.2.1') {
+              setupResultImages('診断結果３-20.png', '診断結果３-19.png', '#65D36E');
+            } else if (currentAnswerKey === '2.4.2.2') {
+              setupResultImages('診断結果３-22.png', '診断結果３-21.png', '#65D36E');
+            } else if (currentAnswerKey === '2.4.2.3') {
+              setupResultImages('診断結果３-24.png', '診断結果３-23.png', '#FF77D9');
+            } else if (currentAnswerKey === '2.4.2.4') {
+              setupResultImages('診断結果３-26.png', '診断結果３-25.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.1.1.1') {
+              setupResultImages('診断結果３-27.png', '診断結果３-28.png', '#FF77D9');
+            } else if (currentAnswerKey === '3.1.1.2') {
+              setupResultImages('診断結果３-29.png', '診断結果３-30.png', '#65D36E');
+            } else if (currentAnswerKey === '3.1.1.3') {
+              setupResultImages('診断結果３-31.png', '診断結果３-32.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.1.1.4') {
+              setupResultImages('診断結果３-33.png', '診断結果３-34.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.1.2.1') {
+              setupResultImages('診断結果３-36.png', '診断結果３-35.png', '#FF77D9');
+            } else if (currentAnswerKey === '3.1.2.2') {
+              setupResultImages('診断結果３-38.png', '診断結果３-37.png', '#65D36E');
+            } else if (currentAnswerKey === '3.1.2.3') {
+              setupResultImages('診断結果４-34_2.png', '診断結果４-33_2.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.1.2.4') {
+              setupResultImages('診断結果３-41.png', '診断結果３-42.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.2.1.1') {
+              setupResultImages('診断結果３-44.png', '診断結果３-43.png', '#FF77D9');
+            } else if (currentAnswerKey === '3.2.1.2') {
+              setupResultImages('診断結果３-45.png', '診断結果３-46.png', '#65D36E');
+            } else if (currentAnswerKey === '3.2.1.3') {
+              setupResultImages('診断結果３-48.png', '診断結果３-47.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.2.1.4') {
+              setupResultImages('診断結果３-49.png', '診断結果３-50.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.2.2.1') {
+              setupResultImages('診断結果３-52.png', '診断結果３-51.png', '#FF77D9');
+            } else if (currentAnswerKey === '3.2.2.2') {
+              setupResultImages('診断結果３-54.png', '診断結果３-53.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.2.2.3') {
+              setupResultImages('アプリデザイン検討-43.png', 'アプリデザイン検討-42.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.2.2.4') {
+              setupResultImages('診断結果３-55.png', '診断結果３-56.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.3.1.1') {
+              setupResultImages('診断結果３-58.png', '診断結果３-57.png', '#FF77D9');
+            } else if (currentAnswerKey === '3.3.1.2') {
+              setupResultImages('診断結果３-60.png', '診断結果３-59.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.3.1.3') {
+              setupResultImages('アプリデザイン検討-37.png', 'アプリデザイン検討-36.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.3.1.4') {
+              setupResultImages('アプリデザイン検討-23.png', 'アプリデザイン検討-22.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.3.2.1') {
+              setupResultImages('診断結果４-01.png', '診断結果４-02.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.3.2.2') {
+              setupResultImages('診断結果４-04.png', '診断結果４-03.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.3.2.3') {
+              setupResultImages('診断結果４-06.png', '診断結果４-05.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.3.2.4') {
+              setupResultImages('診断結果４-07.png', '診断結果４-08.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.4.1.1') {
+              setupResultImages('診断結果４-09.png', '診断結果４-10.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.4.1.2') {
+              setupResultImages('診断結果４-11.png', '診断結果４-12.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.4.1.3') {
+              setupResultImages('診断結果４-14.png', '診断結果４-13.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.4.1.4') {
+              setupResultImages('診断結果４-15.png', '診断結果４-16.png', '#F9A03F');
+            } else if (currentAnswerKey === '3.4.2.1') {
+              setupResultImages('診断結果４-17.png', '診断結果４-18.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.4.2.2') {
+              setupResultImages('アプリデザイン検討-41.png', 'アプリデザイン検討-40.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.4.2.3') {
+              setupResultImages('診断結果４-19.png', '診断結果４-20.png', '#3B82F6');
+            } else if (currentAnswerKey === '3.4.2.4') {
+              setupResultImages('診断結果４-21.png', '診断結果４-22.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.1.1.1') {
+              setupResultImages('診断結果４-23.png', '診断結果４-24.png', '#65D36E');
+            } else if (currentAnswerKey === '4.1.1.2') {
+              setupResultImages('診断結果４-25.png', '診断結果４-26.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.1.1.3') {
+              setupResultImages('診断結果４-27.png', '診断結果４-28.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.1.1.4') {
+              setupResultImages('アプリデザイン検討-20.png', 'アプリデザイン検討-21.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.1.2.1') {
+              setupResultImages('診断結果４-30.png', '診断結果４-29.png', '#FF77D9');
+            } else if (currentAnswerKey === '4.1.2.2') {
+              setupResultImages('診断結果４-32.png', '診断結果４-31.png', '#65D36E');
+            } else if (currentAnswerKey === '4.1.2.4') {
+              setupResultImages('診断結果４-35.png', '診断結果４-36.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.2.1.1') {
+              setupResultImages('診断結果４-37.png', '診断結果４-38.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.2.1.2') {
+              setupResultImages('診断結果３-40.png', '診断結果３-39.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.2.1.3') {
+              setupResultImages('診断結果４-42.png', '診断結果４-41.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.2.1.4') {
+              setupResultImages('診断結果４-44.png', '診断結果４-43.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.2.2.1') {
+              setupResultImages('診断結果４-45.png', '診断結果４-46.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.2.2.2') {
+              setupResultImages('診断結果４-48.png', '診断結果４-47.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.2.2.3') {
+              setupResultImages('診断結果４-50.png', '診断結果４-49.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.2.2.4') {
+              setupResultImages('アプリデザイン検討-26.png', 'アプリデザイン検討-27.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.3.1.1') {
+              setupResultImages('診断結果４-51.png', '診断結果４-52.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.3.1.2') {
+              setupResultImages('診断結果４-54.png', '診断結果４-53.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.3.1.3') {
+              setupResultImages('診断結果４-56.png', '診断結果４-55.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.3.1.4') {
+              setupResultImages('診断結果４-58.png', '診断結果４-57.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.3.2.1') {
+              setupResultImages('診断結果４-59.png', '診断結果４-60.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.3.2.2') {
+              setupResultImages('診断結果４-61.png', '診断結果４-62.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.3.2.3') {
+              setupResultImages('診断結果４-63.png', '診断結果４-64.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.3.2.4') {
+              setupResultImages('診断結果４-66.png', '診断結果４-65.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.4.1.2') {
+              setupResultImages('診断結果４-69.png', '診断結果４-70.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.4.1.3') {
+              setupResultImages('診断結果４-71.png', '診断結果４-72.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.4.1.4') {
+              setupResultImages('診断結果5-01.png', '診断結果5-02.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.4.2.1') {
+              setupResultImages('アプリデザイン検討-39.png', 'アプリデザイン検討-38.png', '#3B82F6');
+            } else if (currentAnswerKey === '4.4.2.2') {
+              setupResultImages('診断結果5-03.png', '診断結果5-04.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.4.2.3') {
+              setupResultImages('アプリデザイン検討-24.png', 'アプリデザイン検討-25.png', '#F9A03F');
+            } else if (currentAnswerKey === '4.4.2.4') {
+              setupResultImages('診断結果5-05.png', '診断結果5-06.png', '#F9A03F');
+            } else {
+              setupResultImages('アプリデザイン検討-44.png', 'アプリデザイン検討-45.png', '#FF77D9');
+            }
+
+            showScreen('screen-06');
+          }, 800);
+        }, 1300);
+      }, 300);
+    }
+
+    function setupResultImages(bgFilename, cardFilename, bgColor) {
+      const bgImg = document.getElementById('result-bg');
+      const cardImg = document.getElementById('result-card');
+      const screen06 = document.getElementById('screen-06');
+      if (bgImg) bgImg.src = bgFilename;
+      if (cardImg) cardImg.src = cardFilename;
+      if (screen06) screen06.style.backgroundColor = bgColor;
+    }
+
+    function openPicker(key) {
+      const cardContent = document.getElementById('picker-card-content');
+      cardContent.innerHTML = '';
+      cardContent.scrollTop = 0;
+
+      const allowedList = getAllowedValuesForCurrentState(key);
+
+      (pickerOptionsData[key] || []).forEach(opt => {
+        const item = document.createElement('div');
+        item.className = 'picker-item';
+        
+        if (key === 'companion') {
+          item.classList.add('companion-item');
+        }
+
+        item.textContent = opt;
+
+        if (allowedList && !allowedList.includes(opt)) {
+          item.classList.add('disabled');
+        }
+        
+        item.onclick = () => {
+          if (item.classList.contains('disabled')) return;
+          selectedValues[key] = opt;
+          document.getElementById(`box-${key}`).textContent = opt;
+          closePicker();
+        };
+
+        cardContent.appendChild(item);
+      });
+      
+      document.getElementById('custom-picker-modal').classList.add('active');
+    }
+
+    function closePicker() {
+      document.getElementById('custom-picker-modal').classList.remove('active');
+    }
+
+    function closePickerOnBg(event) {
+      if (event.target.id === 'custom-picker-modal') closePicker();
+    }
+
+    function submitPlan() {
+      const pref = (selectedValues['pref'] || document.getElementById('box-pref').textContent).trim();
+      const purpose = (selectedValues['purpose'] || document.getElementById('box-purpose').textContent).trim();
+      const duration = (selectedValues['duration'] || document.getElementById('box-duration').textContent).trim();
+      const transport = (selectedValues['transport'] || document.getElementById('box-transport').textContent).trim();
+      const travelTime = (selectedValues['travel-time'] || document.getElementById('box-travel-time').textContent).trim();
+      const budget = (selectedValues['budget'] || document.getElementById('box-budget').textContent).trim();
+      const companion = (selectedValues['companion'] || document.getElementById('box-companion').textContent).trim();
+      const generation = (selectedValues['generation'] || document.getElementById('box-generation').textContent).trim();
+
+      if (!pref || !purpose || !duration || !transport || !travelTime || !budget || !companion || !generation) {
+        alert('すべての項目を選択してください。');
+        return;
+      }
+
+      const imgDay1 = document.getElementById('plan-img-day1');
+      const imgDay2 = document.getElementById('plan-img-day2');
+      imgDay1.src = '';
+      imgDay2.src = '';
+
+      // 倉敷プランの条件判定
+      const kurashikiKeys = ['2.2.1.4', '2.3.1.4', '2.3.2.4', '2.4.1.4', '3.2.1.4', '3.3.1.4', '3.3.2.4', '3.4.1.4'];
+      const isKurashiki = kurashikiKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && duration === '1泊';
+
+      // 宮島プランの条件判定
+      const miyajimaKeys = ['1.3.2.1', '1.4.1.1', '1.4.2.1', '1.4.2.2', '2.3.2.1', '2.4.1.1', '2.4.2.1', '2.4.2.2'];
+      const isMiyajima = miyajimaKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 近江八幡プランの条件判定
+      const omihachimanKeys = ['3.2.1.3', '3.3.1.2', '3.3.1.3', '3.3.2.3', '3.4.1.3', '4.2.1.2', '4.3.1.2', '4.3.1.3'];
+      const isOmihachiman = omihachimanKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 高松プランの条件判定
+      const takamatsuKeys = ['1.1.1.4', '1.2.1.3', '2.1.1.3', '2.2.1.2', '2.2.1.3', '3.1.1.2', '3.2.1.2', '4.1.1.1'];
+      const isTakamatsu = takamatsuKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 金沢プランの条件判定
+      const kanazawaKeys = ['2.4.1.2', '2.4.2.4', '3.3.2.2', '3.4.1.1', '3.4.1.2', '3.4.2.2', '3.4.2.3', '4.3.2.2'];
+      const isKanazawa = kanazawaKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 彦根プランの条件判定
+      const hikoneKeys = ['2.1.1.4', '3.1.1.3', '3.1.1.4', '3.1.2.4', '4.1.1.2', '4.1.1.3', '4.1.1.4', '4.1.2.4'];
+      const isHikone = hikoneKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 伊勢プランの条件判定
+      const iseKeys = ['1.3.2.2', '1.3.2.3', '1.4.1.2', '1.4.1.3', '1.4.2.3', '1.4.2.4', '2.3.2.2', '2.4.2.3'];
+      const isIse = iseKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 鳥取市プランの条件判定
+      const tottoriKeys = ['1.1.1.1', '1.1.1.2', '1.1.1.3', '1.1.2.1', '1.2.1.1', '2.1.1.1', '2.1.1.2', '3.1.1.1'];
+      const isTottori = tottoriKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 小浜プランの条件判定
+      const obamaKeys = ['1.2.2.2', '2.1.2.1', '2.2.2.1', '2.2.2.2', '3.1.2.1', '3.2.1.1', '3.2.2.1', '4.1.2.1'];
+      const isObama = obamaKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 姫路プランの条件判定
+      const himejiKeys = ['3.3.2.1', '3.4.2.1', '4.2.1.1', '4.2.2.1', '4.3.1.1', '4.3.2.1', '4.4.1.1', '4.4.2.1'];
+      const isHimeji = himejiKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 名古屋プランの条件判定
+      const nagoyaKeys = ['1.2.2.3', '1.2.2.4', '2.2.2.3', '2.2.2.4', '3.1.2.3', '3.2.2.2', '3.2.2.3', '4.2.2.2'];
+      const isNagoya = nagoyaKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 有馬温泉プランの条件判定
+      const arimaKeys = ['1.2.1.4', '1.3.1.3', '1.3.1.4', '1.3.2.4', '1.4.1.4', '2.3.1.3', '2.3.2.3', '2.4.1.3'];
+      const isArima = arimaKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 敦賀プランの条件判定
+      const tsurugaKeys = ['1.1.2.2', '1.1.2.3', '1.1.2.4', '2.1.2.2', '2.1.2.3', '2.1.2.4', '3.1.2.2', '4.1.2.2'];
+      const isTsuruga = tsurugaKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 丹波篠山プランの条件判定
+      const tanbasasayamaKeys = ['3.2.2.4', '4.1.2.3', '4.2.1.3', '4.2.1.4', '4.2.2.3', '4.2.2.4', '4.3.1.4', '4.3.2.4'];
+      const isTanbasasayama = tanbasasayamaKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 尾道プランの条件判定
+      const onomichiKeys = ['3.4.2.4', '4.3.2.3', '4.4.1.2', '4.4.1.3', '4.4.1.4', '4.4.2.2', '4.4.2.3', '4.4.2.4'];
+      const isOnomichi = onomichiKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      // 徳島北部プランの条件判定
+      const tokushimaKeys = ['1.2.1.2', '1.2.2.1', '1.3.1.1', '1.3.1.2', '2.2.1.1', '2.3.1.1', '2.3.1.2'];
+      const isTokushima = tokushimaKeys.includes(currentAnswerKey) && purpose === '観光・レジャー' && transport === '電車・新幹線・バス' && duration === '1泊';
+
+      if (isKurashiki) {
+        imgDay1.src = 'プラン画面-03.png';
+        imgDay2.src = 'プラン画面-04.png';
+        showScreen('screen-08');
+      } else if (isMiyajima) {
+        imgDay1.src = 'プラン画面-15.png';
+        imgDay2.src = 'プラン画面-16.png';
+        showScreen('screen-08');
+      } else if (isOmihachiman) {
+        imgDay1.src = 'プラン画面-19.png';
+        imgDay2.src = 'プラン画面-20.png';
+        showScreen('screen-08');
+      } else if (isTakamatsu) {
+        imgDay1.src = 'プラン画面-09.png';
+        imgDay2.src = 'プラン画面-10.png';
+        showScreen('screen-08');
+      } else if (isKanazawa) {
+        imgDay1.src = 'プラン画面-21.png';
+        imgDay2.src = 'プラン画面-22.png';
+        showScreen('screen-08');
+      } else if (isHikone) {
+        imgDay1.src = 'プラン画面-01.png';
+        imgDay2.src = 'プラン画面-02.png';
+        showScreen('screen-08');
+      } else if (isIse) {
+        imgDay1.src = 'プラン画面-29.png';
+        imgDay2.src = 'プラン画面-30.png';
+        showScreen('screen-08');
+      } else if (isTottori) {
+        imgDay1.src = 'プラン画面-27.png';
+        imgDay2.src = 'プラン画面-28.png';
+        showScreen('screen-08');
+      } else if (isObama) {
+        imgDay1.src = 'プラン画面-25.png';
+        imgDay2.src = 'プラン画面-26.png';
+        showScreen('screen-08');
+      } else if (isHimeji) {
+        imgDay1.src = 'プラン画面-17.png';
+        imgDay2.src = 'プラン画面-18.png';
+        showScreen('screen-08');
+      } else if (isNagoya) {
+        imgDay1.src = 'プラン画面-23.png';
+        imgDay2.src = 'プラン画面-24.png';
+        showScreen('screen-08');
+      } else if (isArima) {
+        imgDay1.src = 'プラン画面-11.png';
+        imgDay2.src = 'プラン画面-12.png';
+        showScreen('screen-08');
+      } else if (isTsuruga) {
+        imgDay1.src = 'プラン画面-13.png';
+        imgDay2.src = 'プラン画面-14.png';
+        showScreen('screen-08');
+      } else if (isTanbasasayama) {
+        imgDay1.src = 'プラン画面-05.png';
+        imgDay2.src = 'プラン画面-06.png';
+        showScreen('screen-08');
+      } else if (isOnomichi) {
+        imgDay1.src = 'プラン画面-07.png';
+        imgDay2.src = 'プラン画面-08.png';
+        showScreen('screen-08');
+      } else if (isTokushima) {
+        imgDay1.src = 'プラン画面-31.png';
+        imgDay2.src = 'プラン画面-32.png';
+        showScreen('screen-08');
+      } else {
+        alert('該当する旅行プランが見つかりませんでした。');
+      }
+    }
+
+    function savePlan() {
+      alert('旅行プランを保存しました！');
+      showScreen('screen-01');
+    }
+
+    window.onload = () => {
+      showScreen('screen-01');
+    };
+  </script>
+</body>
+</html>
